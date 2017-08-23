@@ -9,9 +9,14 @@
 #define x_comp      0
 #define y_comp      1
 #define z_comp      2
-#define alpha_comp  3
-#define beta_comp   4
-#define gamma_comp  5
+
+#define sx_comp     3
+#define sy_comp     4
+#define sz_comp     5
+
+#define ax_comp     6
+#define ay_comp     7
+#define az_comp     8
 
 #define flip 1
 
@@ -22,42 +27,44 @@
 using namespace::std;
 
 #define d1  12.5   //ground to q1
-#define d6  12.0 //gripper to wrist
+#define d6  12.0   //gripper to wrist
 #define a2 15.0    //q1 to q2
-#define d4 19.2  //q2 to wrist
+#define d4 19.2    //q2 to wrist
 
-/* takes in array with range [-1,1] and outputs array with range [-1,1].*/
+/* takes in array with range [-1,1] and outputs array with range [-1,1]. Orientation is given by the approach and sliding direction of the gripper. technically 3DOF but 6 outputs */
 void forwardKinematics(double *angles, double *pos){
-
     double q1 =  (angles[0] + 1)*HALF_PI;           /* [0,2PI] */
     double q2 =  (angles[1] + 1)*HALF_PI;           /* [0,2PI] */
     double q3 =  -(angles[2] + 1)*HALF_PI + HALF_PI;/* [PI/2,-PI/2] */
     double q4 =  angles[3]*PI;                      /* [-PI,PI] */
     double q5 = flip*(angles[4] + 1)*HALF_PI;       /* [0,PI] */
     double q6 = angles[5]*PI;                       /* [-PI,PI] */
-    double temp = 1;//a2 + d1 + d4 + d6;
-    cout << q1/PI << endl;
-    cout << q2/PI << endl;
-    cout << q3/PI << endl;
-    cout << q4/PI << endl;
-    cout << q5/PI << endl;
-    cout << q6/PI << endl;
-    cout <<"---------------"<<endl;
-
-    /* the elements of the rotation matrix gathered from the permutated one, see documentation. */
-    /* for instance r21 is actually r22*/
-    double r21 = cos(q1)*(-cos(q4)*cos(q6) + cos(q5)*sin(q4)*sin(q6)) - sin(q1)*(-sin(q2 + q3)*sin(q5)*sin(q6) + cos(q2 + q3)*(cos(q6)*sin(q4) + cos(q4)*sin(q5)*sin(q6)));
-    double r11 = cos(q6)*(cos(q4)*sin(q1) - cos(q1)*cos(q2 + q3)*sin(q4)) - (cos(q5)*sin(q1)*sin(q4) + cos(q1)*(cos(q2 + q3)*cos(q4)*cos(q5) - sin(q2 + q3)*sin(q5)))*sin(q6);
-    double r31 = -cos(q6)*sin(q2 + q3)*sin(q4) - (cos(q4)*cos(q5)*sin(q2 + q3) + cos(q2 + q3)*sin(q5))*sin(q6);
-    double r32 = -cos(q2 + q3)*cos(q5) + cos(q4)*sin(q2 + q3)*sin(q5);
-    double r33 = cos(q4)*cos(q5)*cos(q6)*sin(q2 + q3) + cos(q2 + q3)*cos(q6)*sin(q5) - sin(q2 + q3)*sin(q4)*sin(q6);
-
+    double temp = a2 + d1 + d4 + d6;
+//    cout << q1/PI << endl;
+//    cout << q2/PI << endl;
+//    cout << q3/PI << endl;
+//    cout << q4/PI << endl;
+//    cout << q5/PI << endl;
+//    cout << q6/PI << endl;
+//    cout <<"---------------"<<endl;
+    double sx = cos(q6)*(cos(q4)*sin(q1) - cos(q1)*cos(q2 + q3)*sin(q4)) - (cos(q5)*sin(q1)*sin(q4) + cos(q1)*(cos(q2 + q3)*cos(q4)*cos(q5) - sin(q2 + q3)*sin(q5)))*sin(q6);
+    double sy = cos(q1)*(-cos(q4)*cos(q6) + cos(q5)*sin(q4)*sin(q6)) - sin(q1)*(-sin(q2 + q3)*sin(q5)*sin(q6) + cos(q2 + q3)*(cos(q6)*sin(q4) + cos(q4)*sin(q5)*sin(q6)));
+    double sz = -cos(q6)*sin(q2 + q3)*sin(q4) - (cos(q4)*cos(q5)*sin(q2 + q3) + cos(q2 + q3)*sin(q5))*sin(q6);
+    double ax = sin(q1)*sin(q4)*sin(q5) + cos(q1)*(cos(q5)*sin(q2 + q3) + cos(q2 + q3)*cos(q4)*sin(q5));
+    double ay = cos(q5)*sin(q1)*sin(q2 + q3) + (cos(q2 + q3)*cos(q4)*sin(q1) - cos(q1)*sin(q4))*sin(q5);
+    double az = -cos(q2 + q3)*cos(q5) + cos(q4)*sin(q2 + q3)*sin(q5);
+//    cout << sx << "\t\t" << ax << endl;
+//    cout << sy << "\t\t" << ay << endl;
+//    cout << sz << "\t\t" << az << endl;
     pos[x_comp] = (1.0/temp)*(d6*sin(q1)*sin(q4)*sin(q5) + cos(q1)*(a2*cos(q2) + (d4 + d6*cos(q5))*sin(q2 + q3) + d6*cos(q2 + q3)*cos(q4)*sin(q5)));
     pos[y_comp] = (1.0/temp)*(cos(q3)*(d4 + d6*cos(q5))*sin(q1)*sin(q2) - d6*(cos(q4)*sin(q1)*sin(q2)*sin(q3) + cos(q1)*sin(q4))*sin(q5) + cos(q2)*sin(q1)*(a2 + (d4 + d6*cos(q5))*sin(q3) + d6*cos(q3)*cos(q4)*sin(q5)));
     pos[z_comp] = (1.0/temp)*(d1 - cos(q2 + q3)*(d4 + d6*cos(q5)) + a2*sin(q2) + d6*cos(q4)*sin(q2 + q3)*sin(q5));
-    pos[alpha_comp] = (1.0/PI)*atan2(r21,r11);
-    pos[beta_comp]  = (1.0/PI)*atan2(-r31,sqrt(pow(r32,2) + pow(r33,2)));
-    pos[gamma_comp] = (1.0/PI)*atan2(r32,r33);
+    pos[sx_comp] = sx;
+    pos[sy_comp] = sy;
+    pos[sz_comp] = sz;
+    pos[ax_comp] = ax;
+    pos[ay_comp] = ay;
+    pos[az_comp] = az;
 }
 
 void generateData(int dataPoints){
@@ -67,32 +74,38 @@ void generateData(int dataPoints){
     std::uniform_real_distribution<> dis(-1, 1);
 
     fann_type angles[dataPoints*DOF];
-    fann_type positions[dataPoints*DOF];
+    fann_type positions[dataPoints*(DOF+3)];
     fann_type tempAngles[DOF];
-    fann_type tempPositions[DOF];
+    fann_type tempPositions[(DOF+3)];
 
-    int i =0;
+    int i = 0;
+    int t = 0;
     while(i < dataPoints*DOF){
+
         for (int j=0; j<DOF; j++)
             angles[i+j] = dis(gen);
+
         memcpy(tempAngles,&angles[i],sizeof(double) * DOF);
 
         forwardKinematics(tempAngles,tempPositions);
 
-        memcpy(positions + i,tempPositions,sizeof(double) * DOF);
-        if(positions[i+2]>0)
-            i+=DOF;
+        memcpy(positions + t ,&tempPositions,sizeof(double)*(DOF+3));
+
+        if(positions[t+2]>0){
+            i+=DOF;   /* number of angles*/
+            t+=DOF+3; /* number of "positions" */
+        }
     }
     char data[1024];
     sprintf(data, "pos.dat");
     FILE *file;
     file = fopen(data,"wb");
     for(i=0; i<dataPoints*DOF; i+=DOF){
-        fprintf(file,"%lf\t%lf\t\%lf\n",positions[i],positions[i+1],positions[i+2]);
+        fprintf(file,"%lf\t%lf\t\%lf\t%lf\t%lf\t\%lf\n",positions[i],positions[i+1],positions[i+2],positions[i+6],positions[i+7],positions[i+8]);
     }
     fclose(file);
 
-    struct fann_train_data *train_data = fann_create_train_array(dataPoints, DOF , positions, DOF, angles);
+    struct fann_train_data *train_data = fann_create_train_array(dataPoints, DOF+3 , positions, DOF, angles);
 
     fann_save_train(train_data, "ik_test.dat");
     fann_destroy_train(train_data);
@@ -102,7 +115,7 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
 
 	const double desired_error = (const double) 0.0001;
 	const unsigned int max_epochs = 100000;
-	const unsigned int epochs_between_res = 2500;
+	const unsigned int epochs_between_res = 100;
 	int max_runs = max_epochs/epochs_between_res;
 	struct fann *ann = fann_create_standard_array(num_layers, topology);
     struct fann_train_data *train_data, *test_data;
@@ -148,8 +161,9 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
         cout << 100*(j+1)/(float)max_runs << "%" << endl;
         //printf("MSE error on test data: %f\n", MSE);
         fprintf(outFile, "%d\t%lf \n", (j+1)*epochs_between_res, MSE);
+        fann_save(ann, name);
     }
-	fann_save(ann, name);
+
     /* cleanup */
 	fann_destroy(ann);
 	fann_destroy_train(train_data);
@@ -158,24 +172,20 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
 }
 
 int main(){
-//    generateData(500);
-//
-//    unsigned int layers[3] = {DOF,200,DOF};
-//    trainNetwork(3, layers);
+//   generateData(1000);
+
+    unsigned int layers[4] = {DOF+3,30,30,DOF};
+    trainNetwork(4, layers);
 
 //    unsigned int layers2[4] = {2,50,50,2};
 //    trainNetwork(4, layers2);
 
-//	testNetwork("ik_float_50.net");
-
-//    struct fann *ann = fann_create_from_file("ik_float_15.net");
-//    cout << checkNN(ann) << endl;
-
-    double pos[6];
-    double angles[6] = {0,0,0,0.5,-1,0};
-    forwardKinematics(angles,pos);
-    for(int i=0; i<6; i++)
-        cout << pos[i] << endl;
+//    double pos[9];
+//    double angles[6] = {-0.151387, -0.324997, 0.723476, 0.186593, -0.255015, 0.098493};
+//    forwardKinematics(angles,pos);
+//    for(int i=0; i<9; i++){
+//        cout << pos[i] << "  ";
+//    }
 
 	return 0;
 }

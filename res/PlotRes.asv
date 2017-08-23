@@ -10,11 +10,11 @@ h(2) = plot(x2,y2,'-o');
 hold on;
 h(3) = plot(x3,y3,'-d');
 hold on;
-h(4) = plot(x4,y4,'-s');
+h(4) = plot(x3,y3,'-d');
 hold on;
-h(5) = plot(x5,y5,'-^');
+h(5) = plot(x3,y3,'-d');
 hold on;
-h = legend([h(1) h(2) h(3) h(4) h(5) ],{'$50$','$100$','200','20\_20','20\_10'},'Interpreter','LaTex','fontsize',17);
+h = legend([h(1) h(2) h(3) h(4) h(5) ],{'$30$','$50$','75'},'Interpreter','LaTex','fontsize',17);
 hold off;
 v = get(h,'title');
 set(v,'string','Neurons:')
