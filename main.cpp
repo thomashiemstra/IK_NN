@@ -174,7 +174,7 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
 int main(){
 //   generateData(1000);
 
-    unsigned int layers[4] = {DOF+3,30,30,DOF};
+    unsigned int layers[4] = {DOF+3,30,10,DOF};
     trainNetwork(4, layers);
 
 //    unsigned int layers2[4] = {2,50,50,2};

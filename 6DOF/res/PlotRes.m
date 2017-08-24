@@ -14,7 +14,7 @@ h(4) = plot(x4,y4,'-s');
 hold on;
 h(5) = plot(x5,y5,'-^');
 hold on;
-h = legend([h(1) h(2) h(3) h(4) h(5) ],{'$50$','$100$','200','20\_20','30\_10'},'Interpreter','LaTex','fontsize',17);
+h = legend([h(1) h(2) h(3) h(4) h(5) ],{'$50$','$100$','200','20\_20','20\_10'},'Interpreter','LaTex','fontsize',17);
 hold off;
 v = get(h,'title');
 set(v,'string','Neurons:')
