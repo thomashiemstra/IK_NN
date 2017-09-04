@@ -91,7 +91,7 @@ void generateData(int dataPoints){
 
         memcpy(positions + t ,&tempPositions,sizeof(double)*(DOF+3));
 
-        if(positions[t+2]>0){
+        if(positions[t+y_comp]>0){
             i+=DOF;   /* number of angles*/
             t+=DOF+3; /* number of "positions" */
         }
@@ -100,7 +100,7 @@ void generateData(int dataPoints){
     sprintf(data, "pos.dat");
     FILE *file;
     file = fopen(data,"wb");
-    for(i=0; i<dataPoints*DOF; i+=DOF){
+    for(i=0; i<dataPoints*DOF; i+=(DOF+3)){
         fprintf(file,"%lf\t%lf\t\%lf\t%lf\t%lf\t\%lf\n",positions[i],positions[i+1],positions[i+2],positions[i+6],positions[i+7],positions[i+8]);
     }
     fclose(file);
@@ -172,9 +172,9 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
 }
 
 int main(){
-//   generateData(1000);
+//   generateData(2000);
 
-    unsigned int layers[4] = {DOF+3,30,10,DOF};
+    unsigned int layers[4] = {DOF+3,30,20,DOF};
     trainNetwork(4, layers);
 
 //    unsigned int layers2[4] = {2,50,50,2};
