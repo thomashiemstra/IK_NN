@@ -95,8 +95,8 @@ void generateDataDelta(int dataPoints, int configs){
         for (int j=0; j<OUTPUT; j++)
             startAngles[j] = dis(gen);
         forwardKinematics(startAngles,tempPosition);
-
-        if(tempPosition[z_comp] > 0 ){
+        /* ay_comp > 0 cuz gripper should not point backwards ever*/
+        if(tempPosition[y_comp] > 0 && tempPosition[z_comp] > 0 && tempPosition[ay_comp] > 0){
 
             int k = 0;
             while(k < configs){ /* find configs number of valid target poses */
@@ -105,7 +105,7 @@ void generateDataDelta(int dataPoints, int configs){
                     tempAngles[j] = dis(gen);
                 forwardKinematics(tempAngles,tempPosition);
 
-                if(tempPosition[z_comp] > 0){
+                if(tempPosition[y_comp] > 0 && tempPosition[z_comp] > 0 && tempPosition[ay_comp] > 0){
 
                     for(int l = 0; l < OUTPUT; l++)
                         deltas[l] = 0.5*(tempAngles[l] - startAngles[l]); /* scale from -2,2 to -1,1, DO NOT FORGET TO RESCALE LATER! */
@@ -114,6 +114,7 @@ void generateDataDelta(int dataPoints, int configs){
                     memcpy( tempPosition + 9, startAngles, sizeof(fann_type)*6);
                     int shift = i*INPUT*configs + k*INPUT;
                     memcpy(positions + shift ,tempPosition,sizeof(fann_type)*INPUT);
+                    /* the output of the network are the deltas by which all the angles have to change */
                     shift = i*OUTPUT*configs + k*OUTPUT;
                     memcpy(deltaAngles + shift, deltas, sizeof(double)*OUTPUT);
 
