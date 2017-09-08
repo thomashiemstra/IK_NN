@@ -5,6 +5,7 @@
 #include <chrono>
 #include "doublefann.h"
 #include <string.h>
+#include <chrono>
 
 #define x_comp      0
 #define y_comp      1
@@ -185,7 +186,7 @@ void generateData(int dataPoints){
 
 void trainNetwork(unsigned int num_layers, unsigned int *topology){
 	const double desired_error = (const double) 0.0001;
-	const unsigned int max_epochs = 100000;
+	const unsigned int max_epochs = 10000;
 	const unsigned int epochs_between_res = 100;
 	int max_runs = max_epochs/epochs_between_res;
 	//struct fann *ann = fann_create_standard_array(num_layers, topology);
@@ -222,6 +223,8 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
 
 	outFile = fopen(tempName,"wb");
     double MSE =0;
+
+    auto begin = std::chrono::high_resolution_clock::now();
 	/* train the network and save intermediate results */
     for(int j = 0; j < max_runs; j++){
         fann_train_on_data(ann, train_data, epochs_between_res, 0, desired_error);
@@ -230,8 +233,11 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
         for(unsigned int i = 0; i < fann_length_train_data(test_data); i++)
             fann_test(ann, test_data->input[i], test_data->output[i]);
         MSE = fann_get_MSE(ann);
-        cout << "epochs= " << (j+1)*epochs_between_res << "\t MSE= " << MSE << endl;
-        cout << 100*(j+1)/(float)max_runs << "%" << endl;
+        auto end = std::chrono::high_resolution_clock::now();
+        //cout << "epochs= " << (j+1)*epochs_between_res << "\t MSE= " << MSE << endl;
+        auto time = std::chrono::duration_cast<std::chrono::seconds>(end-begin).count();
+        float percentage = 100*(j+1)/(float)max_runs;
+        cout << percentage << "%    " << (time*(100/percentage)) - time << endl;
         //printf("MSE error on test data: %f\n", MSE);
         fprintf(outFile, "%d\t%lf \n", (j+1)*epochs_between_res, MSE);
         fann_save(ann, name);
@@ -246,11 +252,12 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
 int main(){
 //   generateDataDelta(100,100);
 
-    unsigned int layers[3] = {INPUT,40,OUTPUT};
+    unsigned int layers[3] = {INPUT,5,OUTPUT};
     trainNetwork(3, layers);
 
-//    unsigned int layers2[4] = {2,50,50,2};
-//    trainNetwork(4, layers2);
+//    unsigned int layers1[5] = {INPUT,20,20,10,OUTPUT};
+//    trainNetwork(5, layers1);
+
 
 //    double ps[9];
 //    double angles[6] = {-0.151387, -0.324997, 0.723476, 0.186593, -0.255015, 0.098493};
