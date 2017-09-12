@@ -137,7 +137,7 @@ void generateDataDelta(int dataPoints, int configs){
 
     fann_save_train(train_data, "ik_test_delta.dat");
     fann_destroy_train(train_data);
-    free(deltaAngles); free(positions);// free(tempAngles); free(tempPosition);free(startAngles);
+    free(deltaAngles); free(positions);
 }
 
 void generateData(int dataPoints){
@@ -180,7 +180,7 @@ void generateData(int dataPoints){
 
     struct fann_train_data *train_data = fann_create_train_array(dataPoints, OUTPUT+3 , positions, OUTPUT, angles);
 
-    fann_save_train(train_data, "ik_test.dat");
+    fann_save_train(train_data, "ik_train.dat");
     fann_destroy_train(train_data);
 }
 
@@ -189,22 +189,26 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
 	const unsigned int max_epochs = 10000;
 	const unsigned int epochs_between_res = 100;
 	int max_runs = max_epochs/epochs_between_res;
+
 	//struct fann *ann = fann_create_standard_array(num_layers, topology);
 	//struct fann *ann = fann_create_sparse_array(0.2, num_layers, topology);
-	struct fann *ann = fann_create_shortcut_array(num_layers, topology);
-    struct fann_train_data *train_data, *test_data;
+	//struct fann *ann = fann_create_shortcut_array(num_layers, topology);
+	struct fann *ann = fann_create_from_file("nn/ik_float_40_20.net");
 
+    struct fann_train_data *train_data, *test_data;
     train_data = fann_read_train_from_file("ik_train_delta.dat");
     test_data = fann_read_train_from_file("ik_test_delta.dat");
     /* network settings */
-    fann_set_activation_steepness_hidden(ann, 1);
-	fann_set_activation_steepness_output(ann, 1);
+    fann_set_activation_steepness_hidden(ann, 0.2);
+	fann_set_activation_steepness_output(ann, 0.2);
+
 	fann_set_activation_function_hidden(ann, FANN_SIGMOID_SYMMETRIC);
-	fann_set_activation_function_output(ann, FANN_LINEAR);
+	fann_set_activation_function_output(ann, FANN_SIGMOID_SYMMETRIC);
     fann_set_train_stop_function(ann, FANN_STOPFUNC_BIT);
 	fann_set_bit_fail_limit(ann, 0.1f);
 	fann_set_training_algorithm(ann, FANN_TRAIN_RPROP);
-    //fann_init_weights(ann, train_data);
+
+    fann_set_train_error_function(ann,FANN_ERRORFUNC_TANH);
 
     FILE *outFile;
     char name[1024];
@@ -233,11 +237,12 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
         for(unsigned int i = 0; i < fann_length_train_data(test_data); i++)
             fann_test(ann, test_data->input[i], test_data->output[i]);
         MSE = fann_get_MSE(ann);
+
         auto end = std::chrono::high_resolution_clock::now();
-        //cout << "epochs= " << (j+1)*epochs_between_res << "\t MSE= " << MSE << endl;
-        auto time = std::chrono::duration_cast<std::chrono::seconds>(end-begin).count();
+        cout << "epochs= " << (j+1)*epochs_between_res << "\t MSE= " << MSE << endl;
+        auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end-begin).count();
         float percentage = 100*(j+1)/(float)max_runs;
-        cout << percentage << "%    " << (time*(100/percentage)) - time << endl;
+        cout << percentage << "% time left:" << (1.0/60000)*((time*(100/percentage)) - time) << " mins" << endl;
         //printf("MSE error on test data: %f\n", MSE);
         fprintf(outFile, "%d\t%lf \n", (j+1)*epochs_between_res, MSE);
         fann_save(ann, name);
@@ -250,10 +255,10 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
 }
 
 int main(){
-//   generateDataDelta(100,100);
+//   generateDataDelta(200,200);
 
-    unsigned int layers[3] = {INPUT,5,OUTPUT};
-    trainNetwork(3, layers);
+    unsigned int layers[4] = {INPUT,40,20,OUTPUT};
+    trainNetwork(4, layers);
 
 //    unsigned int layers1[5] = {INPUT,20,20,10,OUTPUT};
 //    trainNetwork(5, layers1);
