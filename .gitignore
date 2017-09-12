@@ -8,6 +8,13 @@
 bin/
 obj/
 
+#result folders
+2DOF/
+3DOF/
+6DOF/
+nn/
+res/
+
 ### C++ ###
 # Prerequisites
 *.d
