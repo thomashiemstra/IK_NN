@@ -150,7 +150,7 @@ void generateDataDeltaOrientation(int dataPoints, int configs){
     double *positions;   /* total input of the NN, error in orientation + angles of initial pose */
 
     deltaAngles = (double *)malloc(sizeof(double)*dataPoints*OUTPUT*configs);
-    positions = (double *)malloc(sizeof(double)*dataPoints*12*configs); /* 6 orientation entries, 6 initial angles*/
+    positions = (double *)malloc(sizeof(double)*dataPoints*12*configs); /* 6 orientation error entries, 6 initial angles*/
 
     double startAngles[6];
     double startPos[INPUT]; /* current pos of the arm */
@@ -228,7 +228,7 @@ void generateDataDeltaPosition(int dataPoints, int configs){
     double *positions;   /* total input of the NN, error in orientation + angles of initial pose */
 
     deltaAngles = (double *)malloc(sizeof(double)*dataPoints*OUTPUT*configs);
-    positions = (double *)malloc(sizeof(double)*dataPoints*9*configs); /* 6 orientation entries, 6 initial angles*/
+    positions = (double *)malloc(sizeof(double)*dataPoints*9*configs); /* 3 position error entries, 6 initial angles*/
 
     double startAngles[6];
     double startPos[INPUT]; /* current pos of the arm */
