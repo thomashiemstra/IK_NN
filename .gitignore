@@ -8,12 +8,14 @@
 bin/
 obj/
 
-#result folders
+#result folders and files
 2DOF/
 3DOF/
 6DOF/
 nn/
 res/
+*.net
+*.dat
 
 ### C++ ###
 # Prerequisites
@@ -49,5 +51,3 @@ res/
 *.out
 *.app
 
-*.net
-*.dat

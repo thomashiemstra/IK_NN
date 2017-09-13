@@ -26,12 +26,12 @@
 #define OUTPUT 6 /* total output of the system, always 6 */
 #define INPUT 15 /* total input of the NN. 9 without initial pose, 15 with */
 
-using namespace::std;
-
 #define d1  12.5   //ground to q1
 #define d6  12.0   //gripper to wrist
 #define a2 15.0    //q1 to q2
 #define d4 19.2    //q2 to wrist
+
+using namespace::std;
 
 /* takes in array with range [-1,1] and outputs array with range [-1,1]. Orientation is given by the approach and sliding direction of the gripper. technically 3DOF but 6 outputs */
 void forwardKinematics(double *angles, double *pos){
@@ -75,18 +75,18 @@ void generateDataDelta(int dataPoints, int configs){
     std::mt19937 gen(seed);
     std::uniform_real_distribution<> dis(-1, 1);
     /* we want to go from startAngles (initial pose) to target pose*/
-    fann_type *deltaAngles; /* angles needed to go from initial pose to target pose */
-    fann_type *positions;   /* total input of the NN, target pose + angles of initial pose */
-    fann_type *tempAngles;  /* angles of the target pose */
-    fann_type *tempPosition;
-    fann_type *startAngles; /* angles of the initial pose */
+    double *deltaAngles; /* angles needed to go from initial pose to target pose */
+    double *positions;   /* total input of the NN, target pose + angles of initial pose */
+    double *tempAngles;  /* angles of the target pose */
+    double *tempPosition;
+    double *startAngles; /* angles of the initial pose */
 
-    deltaAngles = (fann_type *)malloc(sizeof(fann_type)*dataPoints*OUTPUT*configs);
-    positions = (fann_type *)malloc(sizeof(fann_type)*dataPoints*INPUT*configs);
+    deltaAngles = (double *)malloc(sizeof(double)*dataPoints*OUTPUT*configs);
+    positions = (double *)malloc(sizeof(double)*dataPoints*INPUT*configs);
     /* malloc for arrays with only 15 places.... right why not? */
-    tempPosition = (fann_type *)malloc(sizeof(double)*INPUT);
-    tempAngles = (fann_type *)malloc(sizeof(fann_type)*OUTPUT);
-    startAngles = (fann_type *)malloc(sizeof(fann_type)*OUTPUT);
+    tempPosition = (double *)malloc(sizeof(double)*INPUT);
+    tempAngles = (double *)malloc(sizeof(double)*OUTPUT);
+    startAngles = (double *)malloc(sizeof(double)*OUTPUT);
 
     double deltas[OUTPUT];
 
@@ -112,9 +112,9 @@ void generateDataDelta(int dataPoints, int configs){
                         deltas[l] = 0.5*(tempAngles[l] - startAngles[l]); /* scale from -2,2 to -1,1, DO NOT FORGET TO RESCALE LATER! */
 
                     /* first 9 entries are filled by forwardKinematics, the other 6 inputs of the NN are the initial angles corresponding to the initial pose */
-                    memcpy( tempPosition + 9, startAngles, sizeof(fann_type)*6);
+                    memcpy( tempPosition + 9, startAngles, sizeof(double)*6);
                     int shift = i*INPUT*configs + k*INPUT;
-                    memcpy(positions + shift ,tempPosition,sizeof(fann_type)*INPUT);
+                    memcpy(positions + shift ,tempPosition,sizeof(double)*INPUT);
                     /* the output of the network are the deltas by which all the angles have to change */
                     shift = i*OUTPUT*configs + k*OUTPUT;
                     memcpy(deltaAngles + shift, deltas, sizeof(double)*OUTPUT);
@@ -140,16 +140,172 @@ void generateDataDelta(int dataPoints, int configs){
     free(deltaAngles); free(positions);
 }
 
+void generateDataDeltaOrientation(int dataPoints, int configs){
+    std::random_device rd;
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::mt19937 gen(seed);
+    std::uniform_real_distribution<> dis(-1, 1);
+    /* we want to go from startAngles (initial pose) to target pose*/
+    double *deltaAngles; /* angles needed to go from initial pose to target pose */
+    double *positions;   /* total input of the NN, error in orientation + angles of initial pose */
+
+    deltaAngles = (double *)malloc(sizeof(double)*dataPoints*OUTPUT*configs);
+    positions = (double *)malloc(sizeof(double)*dataPoints*12*configs); /* 6 orientation entries, 6 initial angles*/
+
+    double startAngles[6];
+    double startPos[INPUT]; /* current pos of the arm */
+    double desiredPos[INPUT];
+    double correctAngles[6]; /* desired angles of the arm */
+    double orientationError[6];
+
+    double deltas[OUTPUT];
+
+    int i = 0;
+    while(i < dataPoints){
+
+        for (int j=0; j<6; j++)
+            startAngles[j] = dis(gen);
+        forwardKinematics(startAngles,startPos);
+        /* ay_comp > 0 cuz gripper should not point backwards ever*/
+        if(startPos[y_comp] > 0 && startPos[z_comp] > 0 && startPos[ay_comp] > 0){
+
+            int k = 0;
+            while(k < configs){ /* find configs number of valid target poses */
+
+                /* the initial angles should only differ a little from their actual values */
+                for (int j=0; j<6; j++){
+                    correctAngles[j] = startAngles[j] + dis(gen)/4.0;
+                    if(abs(correctAngles[j]) > 1 )
+                        correctAngles[j] = startAngles[j] - dis(gen)/4.0;
+                }
+                forwardKinematics(correctAngles,desiredPos);
+
+                if(desiredPos[y_comp] > 0 && desiredPos[z_comp] > 0 && desiredPos[ay_comp] > 0){
+                    /* since the angles change only a little this error shouldn't need a correction*/
+                    for(int j=0; j<6; j++)
+                        orientationError[j] = (desiredPos[j+3] - startPos[j+3]) ;
+                    /* delta should be between -1/5 and 1/5 so we rescale it*/
+                    for(int l = 0; l < OUTPUT; l++)
+                        deltas[l] = 4*(correctAngles[l] - startAngles[l]);
+
+                    /* first 6 entries are filled by the orientation error, the other 6 inputs of the NN are the initial angles*/
+                    int shift = i*12*configs + k*INPUT;
+                    memcpy(positions + shift ,orientationError,sizeof(double)*6);
+                    memcpy(positions + shift + 6,startAngles,sizeof(double)*6);
+
+                    /* the output of the network are the deltas by which all the angles have to change */
+                    shift = i*OUTPUT*configs + k*OUTPUT;
+                    memcpy(deltaAngles + shift, deltas, sizeof(double)*6);
+
+                    k++; /* add the valid input/output to the list by incrementing k */
+                }
+            }
+        i++; /* add the valid input/output to the list by incrementing i */
+        }
+    }
+    char data[1024];
+    sprintf(data, "pos_delta.dat");
+    FILE *file;
+    file = fopen(data,"wb");
+    for(i=0; i < dataPoints*configs*INPUT; i += INPUT )
+        fprintf(file,"%lf\t%lf\t\%lf\t%lf\t%lf\t\%lf\n",positions[i],positions[i+1],positions[i+2],positions[i+6],positions[i+7],positions[i+8]);
+    fclose(file);
+
+    struct fann_train_data *train_data = fann_create_train_array(dataPoints*configs, 12 , positions, 6, deltaAngles);
+
+    fann_save_train(train_data, "ik_test_delta_orientation.dat");
+    fann_destroy_train(train_data);
+    free(deltaAngles); free(positions);
+}
+
+void generateDataDeltaPosition(int dataPoints, int configs){
+    std::random_device rd;
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::mt19937 gen(seed);
+    std::uniform_real_distribution<> dis(-1, 1);
+    /* we want to go from startAngles (initial pose) to target pose*/
+    double *deltaAngles; /* angles needed to go from initial pose to target pose */
+    double *positions;   /* total input of the NN, error in orientation + angles of initial pose */
+
+    deltaAngles = (double *)malloc(sizeof(double)*dataPoints*OUTPUT*configs);
+    positions = (double *)malloc(sizeof(double)*dataPoints*9*configs); /* 6 orientation entries, 6 initial angles*/
+
+    double startAngles[6];
+    double startPos[INPUT]; /* current pos of the arm */
+    double desiredPos[INPUT];
+    double correctAngles[6]; /* desired angles of the arm */
+    double positionError[3];
+
+    double deltas[OUTPUT];
+
+    int i = 0;
+    while(i < dataPoints){
+
+        for (int j=0; j<6; j++)
+            startAngles[j] = dis(gen);
+        forwardKinematics(startAngles,startPos);
+        /* ay_comp > 0 cuz gripper should not point backwards ever*/
+        if(startPos[y_comp] > 0 && startPos[z_comp] > 0 && startPos[ay_comp] > 0){
+
+            int k = 0;
+            while(k < configs){ /* find configs number of valid target poses */
+
+                /* the initial angles should only differ a little from their actual values */
+                for (int j=0; j<6; j++){
+                    correctAngles[j] = startAngles[j] + dis(gen)/5.0;
+                    if(abs(correctAngles[j]) > 1 )
+                        correctAngles[j] = startAngles[j] - dis(gen)/5.0;
+                }
+                forwardKinematics(correctAngles,desiredPos);
+
+                if(desiredPos[y_comp] > 0 && desiredPos[z_comp] > 0 && desiredPos[ay_comp] > 0){
+                    /* since the angles change only a little this error shouldn't need a correction*/
+                    for(int j=0; j<3; j++)
+                        positionError[j] = (desiredPos[j] - startPos[j]) ;
+                    /* delta should be between -1/5 and 1/5 so we rescale it*/
+                    for(int l = 0; l < OUTPUT; l++)
+                        deltas[l] = 5*(correctAngles[l] - startAngles[l]);
+
+                    /* first 3 entries are filled by the position error, the other 6 inputs of the NN are the initial angles*/
+                    int shift = i*12*configs + k*INPUT;
+                    memcpy(positions + shift ,positionError,sizeof(double)*6);
+                    memcpy(positions + shift + 3,startAngles,sizeof(double)*6);
+
+                    /* the output of the network are the deltas by which all the angles have to change */
+                    shift = i*OUTPUT*configs + k*OUTPUT;
+                    memcpy(deltaAngles + shift, deltas, sizeof(double)*6);
+
+                    k++; /* add the valid input/output to the list by incrementing k */
+                }
+            }
+        i++; /* add the valid input/output to the list by incrementing i */
+        }
+    }
+    char data[1024];
+    sprintf(data, "pos_delta.dat");
+    FILE *file;
+    file = fopen(data,"wb");
+    for(i=0; i < dataPoints*configs*INPUT; i += INPUT )
+        fprintf(file,"%lf\t%lf\t\%lf\t%lf\t%lf\t\%lf\n",positions[i],positions[i+1],positions[i+2],positions[i+6],positions[i+7],positions[i+8]);
+    fclose(file);
+
+    struct fann_train_data *train_data = fann_create_train_array(dataPoints*configs, 9 , positions, 6, deltaAngles);
+
+    fann_save_train(train_data, "ik_test_delta_position.dat");
+    fann_destroy_train(train_data);
+    free(deltaAngles); free(positions);
+}
+
 void generateData(int dataPoints){
     std::random_device rd;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::mt19937 gen(seed);
     std::uniform_real_distribution<> dis(-1, 1);
 
-    fann_type angles[dataPoints*OUTPUT];
-    fann_type positions[dataPoints*INPUT];
-    fann_type tempAngles[OUTPUT];
-    fann_type tempPositions[INPUT];
+    double angles[dataPoints*OUTPUT];
+    double positions[dataPoints*INPUT];
+    double tempAngles[OUTPUT];
+    double tempPositions[INPUT];
 
     int i = 0;
     int t = 0;
@@ -191,22 +347,25 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
 	int max_runs = max_epochs/epochs_between_res;
 
 	//struct fann *ann = fann_create_standard_array(num_layers, topology);
-	//struct fann *ann = fann_create_sparse_array(0.2, num_layers, topology);
+	struct fann *ann = fann_create_sparse_array(0.5, num_layers, topology);
 	//struct fann *ann = fann_create_shortcut_array(num_layers, topology);
-	struct fann *ann = fann_create_from_file("nn/ik_float_40_20.net");
+
+	//struct fann *ann = fann_create_from_file("nn/ik_float_40_20.net");
 
     struct fann_train_data *train_data, *test_data;
     train_data = fann_read_train_from_file("ik_train_delta.dat");
     test_data = fann_read_train_from_file("ik_test_delta.dat");
     /* network settings */
-    fann_set_activation_steepness_hidden(ann, 0.2);
-	fann_set_activation_steepness_output(ann, 0.2);
+    fann_set_activation_steepness_hidden(ann, 0.1);
+	fann_set_activation_steepness_output(ann, 0.1);
 
 	fann_set_activation_function_hidden(ann, FANN_SIGMOID_SYMMETRIC);
 	fann_set_activation_function_output(ann, FANN_SIGMOID_SYMMETRIC);
     fann_set_train_stop_function(ann, FANN_STOPFUNC_BIT);
 	fann_set_bit_fail_limit(ann, 0.1f);
+
 	fann_set_training_algorithm(ann, FANN_TRAIN_RPROP);
+    //fann_set_training_algorithm(ann, FANN_TRAIN_BATCH);
 
     fann_set_train_error_function(ann,FANN_ERRORFUNC_TANH);
 
@@ -255,13 +414,13 @@ void trainNetwork(unsigned int num_layers, unsigned int *topology){
 }
 
 int main(){
-//   generateDataDelta(200,200);
+   generateDataDelta(100,100);
 
-    unsigned int layers[4] = {INPUT,40,20,OUTPUT};
-    trainNetwork(4, layers);
+//    unsigned int layers[4] = {INPUT,40,40,OUTPUT};
+//    trainNetwork(4, layers);
 
-//    unsigned int layers1[5] = {INPUT,20,20,10,OUTPUT};
-//    trainNetwork(5, layers1);
+//    unsigned int layers1[6] = {INPUT,20,20,20,20,OUTPUT};
+//    trainNetwork(6, layers1);
 
 
 //    double ps[9];
